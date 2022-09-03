@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use anchor_spl::token::{Mint, Token};
 
 const DISCRIMINATOR_LENGTH: usize = 8;
 
@@ -7,6 +8,10 @@ declare_id!("8sHSzoGvcHMcgHMihBW4iocoBxzFdvgnnojkJpvdsoVh");
 #[program]
 pub mod anchor_todo_list {
     use super::*;
+
+    pub fn initialize_mint(_ctx: Context<InitializeMint>) -> Result<()> {
+        Ok(())
+    }
 
     pub fn init_todo_list(ctx: Context<InitTodoList>) -> Result<()> {
         ctx.accounts.counter.count = 0;
@@ -67,6 +72,30 @@ impl Todo {
     fn len(message: &str) -> usize {
         DISCRIMINATOR_LENGTH + 8 + (4 + message.len()) + 1
     }
+}
+
+#[derive(Accounts)]
+pub struct InitializeMint<'info> {
+    #[account(mut)]
+    user: Signer<'info>,
+
+    #[account(
+        init, payer = user, space = DISCRIMINATOR_LENGTH,
+        seeds = [b"mint_authority"], bump
+    )]
+    /// CHECK: we don't read or write from this account
+    mint_authority: AccountInfo<'info>,
+
+    #[account(
+        init, payer = user,
+        seeds = [b"mint"], bump,
+        mint::authority = mint_authority, mint::decimals = 0
+    )]
+    mint: Account<'info, Mint>,
+
+    rent: Sysvar<'info, Rent>,
+    token_program: Program<'info, Token>,
+    system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]

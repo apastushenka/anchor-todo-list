@@ -32,6 +32,40 @@ describe('anchor-todo-list', async () => {
         return todoPda;
     }
 
+    it('can initialize mint', async () => {
+        const [mintAuthorityPda] = await anchor.web3.PublicKey.findProgramAddress(
+            [
+                Buffer.from('mint_authority')
+            ],
+            program.programId
+        );
+
+        const [mintPda] = await anchor.web3.PublicKey.findProgramAddress(
+            [
+                Buffer.from('mint')
+            ],
+            program.programId
+        );
+
+        await program.methods
+            .initializeMint()
+            .accounts({
+                user: provider.wallet.publicKey,
+                mintAuthority: mintAuthorityPda,
+                mint: mintPda,
+                rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+                tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
+                systemProgram: anchor.web3.SystemProgram.programId,
+            })
+            .rpc();
+
+        const tokenProgram = anchor.Spl.token(provider);
+        const mint = await tokenProgram.account.mint.fetch(mintPda);
+
+        assert.deepStrictEqual(mint.mintAuthority, mintAuthorityPda);
+        assert.equal(mint.decimals, 0);
+    });
+
     it('can initialize todo list', async () => {
         const counterPda = await findCounterPda(provider.wallet.publicKey);
 
