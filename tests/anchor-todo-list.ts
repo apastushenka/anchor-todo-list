@@ -1,13 +1,28 @@
 import * as anchor from '@project-serum/anchor';
 import { Program } from '@project-serum/anchor';
+import { getAssociatedTokenAddress } from '@solana/spl-token';
+import * as assert from 'assert';
 import { AnchorTodoList } from '../target/types/anchor_todo_list';
-import * as assert from 'assert'
 
 describe('anchor-todo-list', async () => {
     const provider = anchor.AnchorProvider.env();
     anchor.setProvider(provider);
 
     const program = anchor.workspace.AnchorTodoList as Program<AnchorTodoList>;
+    const tokenProgram = anchor.Spl.token(provider);
+    const associatedTokenProgram = anchor.Spl.associatedToken(provider);
+
+    const [mintAuthorityAddress] = await anchor.web3.PublicKey.findProgramAddress(
+        [Buffer.from('mint_authority')],
+        program.programId
+    );
+
+    const [mintAddress] = await anchor.web3.PublicKey.findProgramAddress(
+        [Buffer.from('mint')],
+        program.programId
+    );
+
+    const tokenAddress = await getAssociatedTokenAddress(mintAddress, provider.wallet.publicKey);
 
     const findCounterPda = async (publicKey: anchor.web3.PublicKey) => {
         const [counterPda, _] = await anchor.web3.PublicKey.findProgramAddress(
@@ -32,37 +47,46 @@ describe('anchor-todo-list', async () => {
         return todoPda;
     }
 
+    const testMarkCompleted = async (index: number, tokenAmount: number) => {
+        const todoPda = await findTodoPda(provider.wallet.publicKey, index);
+
+        await program.methods
+            .markCompleted(new anchor.BN(index))
+            .accounts({
+                user: provider.wallet.publicKey,
+                todo: todoPda,
+                mintAuthority: mintAuthorityAddress,
+                mint: mintAddress,
+                token: tokenAddress,
+                tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
+            })
+            .rpc();
+
+        const todo = await program.account.todo.fetch(todoPda);
+        assert.equal(todo.isCompleted, true);
+
+        const token = await tokenProgram.account.token.fetch(tokenAddress);
+        assert.deepStrictEqual(token.authority, provider.wallet.publicKey);
+        assert.deepStrictEqual(token.mint, mintAddress);
+        assert.equal(token.amount, tokenAmount);
+    };
+
     it('can initialize mint', async () => {
-        const [mintAuthorityPda] = await anchor.web3.PublicKey.findProgramAddress(
-            [
-                Buffer.from('mint_authority')
-            ],
-            program.programId
-        );
-
-        const [mintPda] = await anchor.web3.PublicKey.findProgramAddress(
-            [
-                Buffer.from('mint')
-            ],
-            program.programId
-        );
-
         await program.methods
             .initializeMint()
             .accounts({
                 user: provider.wallet.publicKey,
-                mintAuthority: mintAuthorityPda,
-                mint: mintPda,
+                mintAuthority: mintAuthorityAddress,
+                mint: mintAddress,
                 rent: anchor.web3.SYSVAR_RENT_PUBKEY,
                 tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
                 systemProgram: anchor.web3.SystemProgram.programId,
             })
             .rpc();
 
-        const tokenProgram = anchor.Spl.token(provider);
-        const mint = await tokenProgram.account.mint.fetch(mintPda);
+        const mint = await tokenProgram.account.mint.fetch(mintAddress);
 
-        assert.deepStrictEqual(mint.mintAuthority, mintAuthorityPda);
+        assert.deepStrictEqual(mint.mintAuthority, mintAuthorityAddress);
         assert.equal(mint.decimals, 0);
     });
 
@@ -106,18 +130,31 @@ describe('anchor-todo-list', async () => {
         assert.equal(counter.count, 1);
     })
 
-    it('can mark todo completed', async () => {
-        const todoPda = await findTodoPda(provider.wallet.publicKey, 0);
-
-        await program.methods
-            .markCompleted(new anchor.BN(0))
+    it('can create associated token account', async () => {
+        await associatedTokenProgram.methods
+            .create()
             .accounts({
-                user: provider.wallet.publicKey,
-                todo: todoPda,
+                associatedAccount: tokenAddress,
+                authority: provider.wallet.publicKey,
+                mint: mintAddress,
+                owner: provider.wallet.publicKey,
+                rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+                tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
+                systemProgram: anchor.web3.SystemProgram.programId
             })
             .rpc();
 
-        const todo = await program.account.todo.fetch(todoPda);
-        assert.equal(todo.isCompleted, true);
-    })
+        const token = await tokenProgram.account.token.fetch(tokenAddress);
+        assert.deepStrictEqual(token.authority, provider.wallet.publicKey);
+        assert.deepStrictEqual(token.mint, mintAddress);
+        assert.equal(token.amount, 0);
+    });
+
+    it('can mark todo completed', async () => {
+        await testMarkCompleted(0, 1);
+    });
+
+    it('can mark todo completed twice', async () => {
+        await testMarkCompleted(0, 1);
+    });
 });

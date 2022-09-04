@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{Mint, Token};
+use anchor_spl::token::{self, Mint, Token, TokenAccount};
 
 const DISCRIMINATOR_LENGTH: usize = 8;
 
@@ -42,9 +42,28 @@ pub mod anchor_todo_list {
 
     pub fn mark_completed(ctx: Context<MarkCompleted>, _index: u64) -> Result<()> {
         let todo = &mut ctx.accounts.todo;
+
+        if todo.is_completed {
+            return Ok(()); // TODO: return error?
+        }
+
         msg!("Load todo: {:?}", AsRef::<Todo>::as_ref(todo));
         todo.is_completed = true;
         msg!("Update todo: {:?}", AsRef::<Todo>::as_ref(todo));
+
+        let cpi_program = ctx.accounts.token_program.to_account_info();
+        let cpi_accounts = token::MintTo {
+            mint: ctx.accounts.mint.to_account_info(),
+            to: ctx.accounts.token.to_account_info(),
+            authority: ctx.accounts.mint_authority.to_account_info(),
+        };
+
+        let bump = *ctx.bumps.get("mint_authority").unwrap();
+        let bump = &[bump][..];
+        let seeds = &[&[b"mint_authority", bump][..]];
+
+        let cpi_context = CpiContext::new_with_signer(cpi_program, cpi_accounts, seeds);
+        token::mint_to(cpi_context, 1)?;
 
         Ok(())
     }
@@ -137,4 +156,24 @@ pub struct MarkCompleted<'info> {
 
     #[account(mut, seeds = [user.key().as_ref(), index.to_be_bytes().as_ref()], bump)]
     todo: Account<'info, Todo>,
+
+    /// CHECK: we don't read or write from this account
+    #[account(seeds = [b"mint_authority"], bump)]
+    mint_authority: AccountInfo<'info>,
+
+    #[account(
+        mut,
+        seeds = [b"mint"], bump,
+        mint::authority = mint_authority
+    )]
+    mint: Account<'info, Mint>,
+
+    #[account(
+        mut,
+        associated_token::mint = mint,
+        associated_token::authority = user
+    )]
+    token: Account<'info, TokenAccount>,
+
+    token_program: Program<'info, Token>,
 }
