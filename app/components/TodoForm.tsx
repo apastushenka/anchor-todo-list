@@ -1,4 +1,5 @@
 import * as anchor from '@project-serum/anchor';
+import { WalletSignTransactionError } from '@solana/wallet-adapter-base';
 import { Workspace } from '../utils/workspace';
 
 import styles from '../styles/Home.module.css';
@@ -52,8 +53,9 @@ export const TodoForm = ({ program, wallet, counterAddress, todoAddress }: Works
             console.log(`Transaction submitted: https://explorer.solana.com/tx/${txid}?cluster=custom&customUrl=http://localhost:8899`)
         }
         catch (e) {
-            console.log("error: ", e);
-            alert(JSON.stringify(e));
+            if (!(e instanceof WalletSignTransactionError)) {
+                alert(e);
+            }
         }
     }
 

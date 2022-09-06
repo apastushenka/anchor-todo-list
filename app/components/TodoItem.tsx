@@ -1,5 +1,6 @@
 import * as anchor from '@project-serum/anchor';
 import { getAssociatedTokenAddress } from '@solana/spl-token';
+import { WalletSignTransactionError } from '@solana/wallet-adapter-base';
 import { useEffect, useState } from 'react';
 import { Workspace } from '../utils/workspace';
 
@@ -101,7 +102,9 @@ export const TodoItem = ({ index, program, wallet, todoAddress }: { index: numbe
             console.log(`Transaction submitted: https://explorer.solana.com/tx/${txid}?cluster=custom&customUrl=http://localhost:8899`);
         }
         catch (e) {
-            alert(JSON.stringify(e));
+            if (!(e instanceof WalletSignTransactionError)) {
+                alert(e);
+            }
         }
     }
 
