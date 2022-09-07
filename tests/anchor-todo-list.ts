@@ -87,7 +87,7 @@ describe('anchor-todo-list', async () => {
         const mint = await tokenProgram.account.mint.fetch(mintAddress);
 
         assert.deepStrictEqual(mint.mintAuthority, mintAuthorityAddress);
-        assert.equal(mint.decimals, 0);
+        assert.equal(mint.decimals, 9);
     });
 
     it('can initialize todo list', async () => {
@@ -151,10 +151,10 @@ describe('anchor-todo-list', async () => {
     });
 
     it('can mark todo completed', async () => {
-        await testMarkCompleted(0, 1);
+        await testMarkCompleted(0, 1_000_000_000);
     });
 
     it('can mark todo completed twice', async () => {
-        await testMarkCompleted(0, 1);
+        await testMarkCompleted(0, 1_000_000_000);
     });
 });

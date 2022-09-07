@@ -63,7 +63,7 @@ pub mod anchor_todo_list {
         let seeds = &[&[b"mint_authority", bump][..]];
 
         let cpi_context = CpiContext::new_with_signer(cpi_program, cpi_accounts, seeds);
-        token::mint_to(cpi_context, 1)?;
+        token::mint_to(cpi_context, 1_000_000_000)?;
 
         Ok(())
     }
@@ -108,7 +108,7 @@ pub struct InitializeMint<'info> {
     #[account(
         init, payer = user,
         seeds = [b"mint"], bump,
-        mint::authority = mint_authority, mint::decimals = 0
+        mint::authority = mint_authority, mint::decimals = 9
     )]
     mint: Account<'info, Mint>,
 
