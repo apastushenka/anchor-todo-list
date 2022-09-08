@@ -1,3 +1,4 @@
+import { Metadata, PROGRAM_ID as tokenMetadataProgram, TokenStandard } from '@metaplex-foundation/mpl-token-metadata';
 import * as anchor from '@project-serum/anchor';
 import { Program } from '@project-serum/anchor';
 import { getAssociatedTokenAddress } from '@solana/spl-token';
@@ -20,6 +21,15 @@ describe('anchor-todo-list', async () => {
     const [mintAddress] = await anchor.web3.PublicKey.findProgramAddress(
         [Buffer.from('mint')],
         program.programId
+    );
+
+    const [metadataAddress] = await anchor.web3.PublicKey.findProgramAddress(
+        [
+            Buffer.from('metadata'),
+            tokenMetadataProgram.toBuffer(),
+            mintAddress.toBuffer(),
+        ],
+        tokenMetadataProgram
     );
 
     const tokenAddress = await getAssociatedTokenAddress(mintAddress, provider.wallet.publicKey);
@@ -78,16 +88,23 @@ describe('anchor-todo-list', async () => {
                 user: provider.wallet.publicKey,
                 mintAuthority: mintAuthorityAddress,
                 mint: mintAddress,
-                rent: anchor.web3.SYSVAR_RENT_PUBKEY,
-                tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
+                metadata: metadataAddress,
                 systemProgram: anchor.web3.SystemProgram.programId,
+                tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
+                tokenMetadataProgram,
+                rent: anchor.web3.SYSVAR_RENT_PUBKEY,
             })
             .rpc();
 
         const mint = await tokenProgram.account.mint.fetch(mintAddress);
-
         assert.deepStrictEqual(mint.mintAuthority, mintAuthorityAddress);
         assert.equal(mint.decimals, 9);
+
+        const metadata = await Metadata.fromAccountAddress(provider.connection, metadataAddress);
+        assert.equal(metadata.mint.toBase58(), mintAddress.toBase58());
+        assert.equal(metadata.updateAuthority.toBase58(), mintAuthorityAddress.toBase58());
+        assert.equal(metadata.data.symbol, 'TODO\x00\x00\x00\x00\x00\x00');
+        assert.equal(metadata.tokenStandard, TokenStandard.Fungible);
     });
 
     it('can initialize todo list', async () => {

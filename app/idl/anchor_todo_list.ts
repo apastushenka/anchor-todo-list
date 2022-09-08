@@ -21,7 +21,12 @@ export type AnchorTodoList = {
           "isSigner": false
         },
         {
-          "name": "rent",
+          "name": "metadata",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
           "isMut": false,
           "isSigner": false
         },
@@ -31,7 +36,12 @@ export type AnchorTodoList = {
           "isSigner": false
         },
         {
-          "name": "systemProgram",
+          "name": "tokenMetadataProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rent",
           "isMut": false,
           "isSigner": false
         }
@@ -191,7 +201,12 @@ export const IDL: AnchorTodoList = {
           "isSigner": false
         },
         {
-          "name": "rent",
+          "name": "metadata",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
           "isMut": false,
           "isSigner": false
         },
@@ -201,7 +216,12 @@ export const IDL: AnchorTodoList = {
           "isSigner": false
         },
         {
-          "name": "systemProgram",
+          "name": "tokenMetadataProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rent",
           "isMut": false,
           "isSigner": false
         }

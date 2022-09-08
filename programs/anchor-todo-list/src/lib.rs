@@ -1,5 +1,7 @@
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::program::invoke_signed;
 use anchor_spl::token::{self, Mint, Token, TokenAccount};
+use mpl_token_metadata::instruction::create_metadata_accounts_v3;
 
 const DISCRIMINATOR_LENGTH: usize = 8;
 
@@ -9,7 +11,39 @@ declare_id!("8sHSzoGvcHMcgHMihBW4iocoBxzFdvgnnojkJpvdsoVh");
 pub mod anchor_todo_list {
     use super::*;
 
-    pub fn initialize_mint(_ctx: Context<InitializeMint>) -> Result<()> {
+    pub fn initialize_mint(ctx: Context<InitializeMint>) -> Result<()> {
+        let ix = create_metadata_accounts_v3(
+            ctx.accounts.token_metadata_program.key(),
+            ctx.accounts.metadata.key(),
+            ctx.accounts.mint.key(),
+            ctx.accounts.mint_authority.key(),
+            ctx.accounts.user.key(),
+            ctx.accounts.mint_authority.key(),
+            "TODO Coin".to_string(),
+            "TODO".to_string(),
+            "https://ipfs.io/ipfs/QmS9Bj3ysMr3Zuy2YoAKoykHePFVSLZDXVRs6KjTMsuaSd".to_string(),
+            None,
+            0,
+            true,
+            false,
+            None,
+            None,
+            None,
+        );
+
+        let accounts = [
+            ctx.accounts.metadata.clone(),
+            ctx.accounts.mint.to_account_info(),
+            ctx.accounts.mint_authority.clone(),
+            ctx.accounts.user.to_account_info(),
+            ctx.accounts.mint_authority.clone(),
+            ctx.accounts.system_program.to_account_info(),
+            ctx.accounts.rent.to_account_info(),
+        ];
+
+        let seeds: &[&[&[u8]]] = &[&mint_authority_seeds(&ctx)];
+
+        invoke_signed(&ix, &accounts, seeds)?;
         Ok(())
     }
 
@@ -57,10 +91,7 @@ pub mod anchor_todo_list {
             to: ctx.accounts.token.to_account_info(),
             authority: ctx.accounts.mint_authority.to_account_info(),
         };
-
-        let bump = *ctx.bumps.get("mint_authority").unwrap();
-        let bump = &[bump][..];
-        let seeds = &[&[b"mint_authority", bump][..]];
+        let seeds: &[&[&[u8]]] = &[&mint_authority_seeds(&ctx)];
 
         let cpi_context = CpiContext::new_with_signer(cpi_program, cpi_accounts, seeds);
         token::mint_to(cpi_context, 1_000_000_000)?;
@@ -98,11 +129,11 @@ pub struct InitializeMint<'info> {
     #[account(mut)]
     user: Signer<'info>,
 
+    /// CHECK: we don't read or write from this account
     #[account(
         init, payer = user, space = DISCRIMINATOR_LENGTH,
         seeds = [b"mint_authority"], bump
     )]
-    /// CHECK: we don't read or write from this account
     mint_authority: AccountInfo<'info>,
 
     #[account(
@@ -112,9 +143,18 @@ pub struct InitializeMint<'info> {
     )]
     mint: Account<'info, Mint>,
 
-    rent: Sysvar<'info, Rent>,
-    token_program: Program<'info, Token>,
+    /// CHECK: we don't read or write from this account
+    #[account(mut)]
+    metadata: AccountInfo<'info>,
+
     system_program: Program<'info, System>,
+    token_program: Program<'info, Token>,
+
+    /// CHECK: we don't read or write from this account
+    #[account(executable, address = mpl_token_metadata::id())]
+    token_metadata_program: AccountInfo<'info>,
+
+    rent: Sysvar<'info, Rent>,
 }
 
 #[derive(Accounts)]
@@ -176,4 +216,10 @@ pub struct MarkCompleted<'info> {
     token: Account<'info, TokenAccount>,
 
     token_program: Program<'info, Token>,
+}
+
+fn mint_authority_seeds<'a, T>(ctx: &'a Context<T>) -> [&'a [u8]; 2] {
+    let bump = ctx.bumps.get("mint_authority").unwrap();
+
+    [b"mint_authority", std::slice::from_ref(bump)]
 }
